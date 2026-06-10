@@ -1,0 +1,76 @@
+<mujoco model="double_pendulum_testbed">
+  <!--
+    Underactuated 2-link planar arm:
+    - Fixed red ball anchor (welded to world, mid-air)
+    - Joint 1 (shoulder, ACTUATED): hinge about y between ball and arm 1
+    - Joint 2 (elbow, PASSIVE): hinge about y between arm 1 and arm 2
+    - Both hinges about the world y-axis -> motion in the x-z vertical plane
+    - Angle 0 = links hanging straight down
+  -->
+
+  <compiler angle="radian" autolimits="true"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <default>
+    <joint armature="0.01" damping="0.05"/>
+    <geom friction="0.8 0.005 0.0001" density="1000"/>
+  </default>
+
+  <visual>
+    <headlight diffuse="0.7 0.7 0.7" ambient="0.3 0.3 0.3"/>
+    <global azimuth="135" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.4 0.5 0.6" rgb2="0.1 0.1 0.15" width="256" height="256"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.2 0.25 0.3" rgb2="0.3 0.35 0.4" width="300" height="300"/>
+    <material name="grid_mat" texture="grid" texrepeat="6 6" reflectance="0.1"/>
+    <material name="anchor_mat" rgba="0.9 0.1 0.1 1"/>
+    <material name="arm1_mat" rgba="0.85 0.45 0.1 1"/>
+    <material name="arm2_mat" rgba="0.95 0.75 0.1 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 -1 2" dir="0 0.4 -1"/>
+    <geom name="floor" type="plane" size="2 2 0.05" material="grid_mat"/>
+
+    <!-- Fixed anchor ball, welded to the world in mid-air -->
+    <body name="anchor" pos="0 0 1.5">
+      <geom name="ball" type="sphere" size="0.06" material="anchor_mat"/>
+
+      <!-- Arm 1: ACTUATED shoulder hinge at the ball -->
+      <body name="arm1" pos="0 0 0">
+        <joint name="shoulder" type="hinge" axis="0 1 0" range="-2.0944 2.0944"/>
+        <geom name="link1" type="capsule" fromto="0 0 0  0 0 -0.35" size="0.025" material="arm1_mat"/>
+
+        <!-- Arm 2: PASSIVE elbow hinge at the end of arm 1 -->
+        <body name="arm2" pos="0 0 -0.35">
+          <joint name="elbow" type="hinge" axis="0 1 0" range="-2.7925 2.7925" damping="0.1"/>
+          <geom name="link2" type="capsule" fromto="0 0 0  0 0 -0.3" size="0.02" material="arm2_mat"/>
+          <site name="tip" pos="0 0 -0.3" size="0.01"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <contact>
+    <!-- Anchor is welded to the world, so the default parent-child contact
+         exclusion does not apply; exclude ball-arm1 collision explicitly.
+         (arm1-arm2 are joint-connected parent/child -> excluded automatically.) -->
+    <exclude body1="anchor" body2="arm1"/>
+  </contact>
+
+  <actuator>
+    <!-- PD position servo on the SHOULDER only. Elbow is passive. -->
+    <position name="shoulder_servo" joint="shoulder" kp="20" kv="2"
+              ctrlrange="-2.0944 2.0944" forcerange="-30 30"/>
+  </actuator>
+
+  <sensor>
+    <jointpos name="shoulder_pos" joint="shoulder"/>
+    <jointvel name="shoulder_vel" joint="shoulder"/>
+    <actuatorfrc name="servo_torque" actuator="shoulder_servo"/>
+    <jointpos name="elbow_pos" joint="elbow"/>
+  </sensor>
+</mujoco>
